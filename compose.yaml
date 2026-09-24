@@ -1,0 +1,29 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reservapatterns
+      POSTGRES_USER: ${RESERVA_DB_USER:?Defina RESERVA_DB_USER}
+      POSTGRES_PASSWORD: ${RESERVA_DB_PASSWORD:?Defina RESERVA_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      RESERVA_DB_URL: jdbc:postgresql://database:5432/reservapatterns
+      RESERVA_DB_USER: ${RESERVA_DB_USER:?Defina RESERVA_DB_USER}
+      RESERVA_DB_PASSWORD: ${RESERVA_DB_PASSWORD:?Defina RESERVA_DB_PASSWORD}
+      RESERVA_JWT_SECRET: ${RESERVA_JWT_SECRET:?Defina RESERVA_JWT_SECRET}
+      RESERVA_ADMIN_USER: ${RESERVA_ADMIN_USER:?Defina RESERVA_ADMIN_USER}
+      RESERVA_ADMIN_PASSWORD: ${RESERVA_ADMIN_PASSWORD:?Defina RESERVA_ADMIN_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
+volumes:
+  pgdata:

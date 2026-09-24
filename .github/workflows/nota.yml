@@ -1,0 +1,57 @@
+name: Publicar nota ReservaPatterns
+
+on:
+  workflow_run:
+    workflows: ["Avaliador ReservaPatterns"]
+    types: [completed]
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  publicar:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar nota
+        uses: actions/download-artifact@v4
+        with:
+          name: nota-do-pr
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/nota
+
+      - name: Atualizar comentário do PR
+        uses: actions/github-script@v7
+        env:
+          REPORT_DIR: ${{ runner.temp }}/nota
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = process.env.REPORT_DIR;
+            const raw = fs.readFileSync(path.join(dir, 'pr-numero.txt'), 'utf8').trim();
+            if (!/^\d{1,8}$/.test(raw)) throw new Error('Número de PR inválido');
+            const number = Number(raw);
+            const { owner, repo } = context.repo;
+            const run = context.payload.workflow_run;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            const currentRevision = pr.head.sha === run.head_sha
+              || pr.merge_commit_sha === run.head_sha;
+            if (pr.state !== 'open' || !currentRevision) return;
+            const body = fs.readFileSync(path.join(dir, 'nota.md'), 'utf8');
+            const marker = '<!-- avaliador-reservapatterns -->';
+            if (!body.startsWith(marker) || body.length > 40000) {
+              throw new Error('Relatório inválido');
+            }
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: number, per_page: 100
+            });
+            const previous = comments.find(c => c.user?.type === 'Bot' && c.body?.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            }

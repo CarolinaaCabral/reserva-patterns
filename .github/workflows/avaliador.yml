@@ -1,0 +1,76 @@
+name: Avaliador ReservaPatterns
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reservapatterns-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  avaliar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Buscar projeto oficial
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          path: official
+
+      - name: Buscar código do grupo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          path: submission
+
+      - name: Copiar somente código dos exercícios
+        run: python3 official/.github/evaluation/copy_submission.py submission official
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: official/pom.xml
+
+      - id: tests
+        continue-on-error: true
+        working-directory: official
+        run: mvn -B -ntp -Dmaven.test.failure.ignore=true clean test
+
+      - id: lint
+        continue-on-error: true
+        working-directory: official
+        run: mvn -B -ntp checkstyle:check
+
+      - id: grade
+        if: always()
+        working-directory: official
+        run: |
+          python3 .github/evaluation/grade.py \
+            --build-status ${{ steps.tests.outcome == 'success' && '0' || '1' }} \
+            --lint-status ${{ steps.lint.outcome == 'success' && '0' || '1' }}
+          echo "${{ github.event.pull_request.number }}" > pr-numero.txt
+
+      - name: Guardar nota
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nota-do-pr
+          path: |
+            official/nota.md
+            official/pr-numero.txt
+          if-no-files-found: error
+
+      - name: Verificar nota mínima
+        if: steps.grade.outcome == 'success'
+        run: |
+          python3 -c "import sys; sys.exit(float('${{ steps.grade.outputs.nota }}') < float('${{ steps.grade.outputs.minimo }}'))"

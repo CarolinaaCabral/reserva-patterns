@@ -1,0 +1,31 @@
+{
+  "projeto": "ReservaPatterns — Lista 02",
+  "notaMinima": 80,
+  "requisitos": [
+    {
+      "titulo": "Builder",
+      "peso": 25,
+      "classe": "br.upe.reservapatterns.evaluation.Req01BuilderTest"
+    },
+    {
+      "titulo": "Prototype",
+      "peso": 20,
+      "classe": "br.upe.reservapatterns.evaluation.Req02PrototypeTest"
+    },
+    {
+      "titulo": "Factory Method",
+      "peso": 25,
+      "classe": "br.upe.reservapatterns.evaluation.Req03FactoryMethodTest"
+    },
+    {
+      "titulo": "Abstract Factory",
+      "peso": 25,
+      "classe": "br.upe.reservapatterns.evaluation.Req04AbstractFactoryTest"
+    },
+    {
+      "titulo": "Estilo de código",
+      "peso": 5,
+      "tipo": "lint"
+    }
+  ]
+}
